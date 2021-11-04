@@ -13,7 +13,7 @@ proceed_command losetup
 proceed_command resize2fs
 opkg install coreutils-truncate || true
 
-board_id=$(cat /etc/board.json | jsonfilter -e '@["model"].id' | sed 's/friendly.*,nanopi-//;s/xunlong,orangepi-//;s/^r1s-h5$/r1s/;s/^r1$/r1s-h3/;s/^r1-plus$/r1p/;s/default-string-default-string/x86/')
+board_id=$(cat /etc/board.json | jsonfilter -e '@["model"].id' | sed 's/friendly.*,nanopi-//;s/xunlong,orangepi-//;s/^r1s-h5$/r1s/;s/^r1$/r1s-h3/;s/^r1-plus$/r1p/;s/default-string-default-string/x86/;s/vmware-inc-vmware7-1/x86/')
 mount -t tmpfs -o remount,size=850m tmpfs /tmp
 rm -rf /tmp/upg && mkdir /tmp/upg && cd /tmp/upg
 
@@ -40,8 +40,10 @@ if [ $md5r != $md5sum ]; then
 fi
 
 mv $board_id.img FriendlyWrt.img
-[ $board_id == 'x86' ] && drive='sda' || drive='mmcblk0'
-bs=`expr $(cat /sys/block/$drive/size) \* 512`
+block_device='mmcblk0'
+[ ! -d /sys/block/$block_device ] && block_device='mmcblk1'
+[ $board_id = 'x86' ] && block_device='sda'
+bs=`expr $(cat /sys/block/$block_device/size) \* 512`
 truncate -s $bs FriendlyWrt.img || ../truncate -s $bs FriendlyWrt.img
 echo ", +" | sfdisk -N 2 FriendlyWrt.img
 
@@ -78,8 +80,7 @@ echo -e '\e[92m开始写入，请勿中断...\e[0m'
 if [ -f FriendlyWrt.img ]; then
 	echo 1 > /proc/sys/kernel/sysrq
 	echo u > /proc/sysrq-trigger && umount / || true
-	#pv FriendlyWrt.img | dd of=/dev/mmcblk0 conv=fsync
-	dd if=FriendlyWrt.img of=/dev/$drive oflag=direct conv=sparse status=progress bs=1M
+	dd if=FriendlyWrt.img of=/dev/$block_device oflag=direct conv=sparse status=progress bs=1M
 	echo -e '\e[92m刷机完毕，正在重启...\e[0m'
 	echo b > /proc/sysrq-trigger
 fi
